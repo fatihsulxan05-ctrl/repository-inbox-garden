@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { isGroupId, replaceGroup, sliceGroup, type GroupId } from "./groups";
+import { createTakrirDay, setTakrir, type TakrirDay } from "./takrir";
 
 export type Student = {
   id: string;
@@ -70,6 +71,10 @@ type Store = {
   replaceAll: (s: State) => void;
   group: GroupId;
   setGroup: (g: GroupId) => void;
+  takrirler: TakrirDay[];
+  addTakrirDay: (date: string) => void;
+  markTakrir: (date: string, studentId: string, verdi: boolean) => void;
+  removeTakrirDay: (date: string) => void;
 };
 
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -77,14 +82,14 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const KEY = "kuran-kursu-store-v2";
 const GROUP_KEY = "kuran-kursu-active-group";
 
-export type State = { students: Student[]; tutanaklar: Tutanak[]; attendance: AttendanceRow[] };
+export type State = { students: Student[]; tutanaklar: Tutanak[]; attendance: AttendanceRow[]; takrirler?: TakrirDay[] };
 
 function load(): State {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const s = JSON.parse(raw) as Partial<State>;
-      return { students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [] };
+      return { students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [], takrirler: s.takrirler ?? [] };
     }
   } catch {
     /* ignore */
@@ -124,6 +129,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const store: Store = {
     ...view,
+    takrirler: state.takrirler ?? [],
+    addTakrirDay: (date) => setState((p) => ({ ...p, takrirler: createTakrirDay(p.takrirler ?? [], uid(), date, view.students.map((s) => s.id)) })),
+    markTakrir: (date, studentId, verdi) => setState((p) => ({ ...p, takrirler: setTakrir(p.takrirler ?? [], date, studentId, verdi) })),
+    removeTakrirDay: (date) => setState((p) => ({ ...p, takrirler: (p.takrirler ?? []).filter((d) => d.date !== date) })),
     all: state,
     group,
     setGroup,
@@ -131,6 +140,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     updateStudent: (id, s) => setState((p) => ({ ...p, students: p.students.map((x) => (x.id === id ? { ...x, ...s } : x)) })),
     removeStudent: (id) =>
       setState((p) => ({
+        ...p,
         students: p.students.filter((x) => x.id !== id),
         tutanaklar: p.tutanaklar.filter((x) => x.studentId !== id),
         attendance: p.attendance.filter((x) => x.studentId !== id),
@@ -152,8 +162,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }),
     importAll: (s) =>
-      setState((p) => replaceGroup(p, group, { students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [] })),
-    replaceAll: (s) => setState({ students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [] }),
+      setState((p) => ({ ...replaceGroup(p, group, { students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [] }), takrirler: s.takrirler ?? p.takrirler ?? [] })),
+    replaceAll: (s) => setState({ students: s.students ?? [], tutanaklar: s.tutanaklar ?? [], attendance: s.attendance ?? [], takrirler: s.takrirler ?? [] }),
   };
 
   return <StoreContext.Provider value={store}>{children}</StoreContext.Provider>;

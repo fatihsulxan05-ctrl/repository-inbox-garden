@@ -13,6 +13,7 @@ import { TutanakFiles } from "@/components/app/TutanakFiles";
 import { deleteFile, newFileId, prepareFile, putFile } from "@/lib/attachments";
 import { useStore, type Student, type Tutanak } from "@/lib/store";
 import { PdfButton } from "@/components/app/PdfButton";
+import { takrirStats } from "@/lib/takrir";
 import { computeStats, daysSinceFirst, monthly, VAKITLER } from "@/lib/stats";
 import { telHref } from "@/lib/phone";
 
@@ -127,6 +128,7 @@ function TalebeDetay() {
   const tut = store.tutanaklar.filter((t) => t.studentId === id).sort((a, b) => b.date.localeCompare(a.date));
   const st = computeStats(rows);
   const months = monthly(rows);
+  const tk = takrirStats(store.takrirler, id);
 
   const remove = () => {
     if (confirm(`${student.name} ve tüm kayıtları silinsin mi?`)) { tut.forEach((t) => { if (t.photoId) deleteFile(t.photoId); if (t.docId) deleteFile(t.docId); }); store.removeStudent(id); navigate({ to: "/" }); }
@@ -198,6 +200,8 @@ function TalebeDetay() {
               { l: "Geç Kaldı (vakit)", v: st.gecVakit, c: "text-warn" },
               { l: "İzinli (vakit)", v: st.izinliVakit, c: "text-info" },
               { l: "Hasta (vakit)", v: st.hastaVakit, c: "text-info" },
+              { l: "Takrir Verdi (gün)", v: tk.verdi, c: "text-good" },
+              { l: "Takrir Vermedi (gün)", v: tk.vermedi, c: "text-destructive" },
             ].map((s) => (
               <div key={s.l} className="rounded-2xl bg-surface py-3">
                 <p className={`font-serif text-2xl font-bold ${s.c}`}>{s.v}</p>
