@@ -120,16 +120,24 @@ export type AutoLevel = "Çok İyi" | "İyi" | "Orta" | "Zayıf" | "Yeni";
 export const LEVEL_ORDER: Record<AutoLevel, number> = { "Çok İyi": 0, "İyi": 1, "Orta": 2, "Zayıf": 3, "Yeni": 4 };
 
 /** Automatic status from all prayer + lesson cells; İzinli/Hasta cells are not counted against the student. */
-export function autoLevel(rows: AttendanceRow[]): { level: AutoLevel; rate: number } {
-  let came_ = 0, total = 0;
-  for (const r of latestPerDay(rows)) for (const c of COLUMNS) {
+/**
+ * Monthly level from missed prayers (namaz only, ders excluded) in the given month:
+ * 0–1 missed = Çok İyi, 2–3 = İyi, 4 = Orta, 5+ = Zayıf.
+ * Any geç / hasta / izinli prayer that month caps the result at İyi.
+ */
+export function autoLevel(rows: AttendanceRow[], today: Date = new Date()): { level: AutoLevel; rate: number; missed: number } {
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit" }).format(today);
+  const monthRows = latestPerDay(rows).filter((r) => r.date.slice(0, 7) === month);
+  let missed = 0, total = 0, came_ = 0, flagged = false;
+  for (const r of monthRows) for (const c of VAKITLER) {
     const s = cellStatus(r, c);
-    if (s === "izinli" || s === "hasta") continue;
     total++;
-    if (came(s)) came_++;
+    if (s === "yok") missed++;
+    else if (s === "geldi") came_++;
+    else { flagged = true; if (s === "gec") came_++; }
   }
-  if (total === 0) return { level: "Yeni", rate: 0 };
-  const rate = came_ / total;
-  const level: AutoLevel = rate >= 0.95 ? "Çok İyi" : rate >= 0.88 ? "İyi" : rate >= 0.8 ? "Orta" : "Zayıf";
-  return { level, rate };
+  if (total === 0) return { level: "Yeni", rate: 0, missed: 0 };
+  let level: AutoLevel = missed <= 1 ? "Çok İyi" : missed <= 3 ? "İyi" : missed === 4 ? "Orta" : "Zayıf";
+  if (flagged && level === "Çok İyi") level = "İyi";
+  return { level, rate: came_ / total, missed };
 }
